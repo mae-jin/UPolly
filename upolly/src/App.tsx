@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './App.css';
 
 // ============================================================================
@@ -478,7 +478,7 @@ function App() {
   // AUDIO CONTROL HANDLERS
   // ------------------------------------------------------------------------
 
-  const jumpToSentence = (index: number) => {
+  const jumpToSentence = useCallback((index: number) => {
     if (audioRef.current && state.sentences[index]) {
       const time = state.sentences[index].start;
       audioRef.current.currentTime = time;
@@ -492,9 +492,9 @@ function App() {
       
       console.log(`🎯 JUMPED TO SENTENCE ${index + 1}`);
     }
-  };
+  }, [state.sentences]);
 
-  const togglePlayPause = () => {
+  const togglePlayPause = useCallback(() => {
     if (!audioRef.current) return;
     
     if (state.isPlaying) {
@@ -502,21 +502,21 @@ function App() {
     } else {
       audioRef.current.play();
     }
-  };
+  }, [state.isPlaying]);
 
-  const goToPrevSentence = () => {
+  const goToPrevSentence = useCallback(() => {
     if (state.currentSentenceIndex > 0) {
       jumpToSentence(state.currentSentenceIndex - 1);
     } else if (state.sentences.length > 0) {
       jumpToSentence(0);
     }
-  };
+  }, [state.currentSentenceIndex, state.sentences.length, jumpToSentence]);
 
-  const goToNextSentence = () => {
+  const goToNextSentence = useCallback(() => {
     if (state.currentSentenceIndex < state.sentences.length - 1) {
       jumpToSentence(state.currentSentenceIndex + 1);
     }
-  };
+  }, [state.currentSentenceIndex, state.sentences.length, jumpToSentence]);
 
   const changeSpeed = (speed: number) => {
     updateState({ playbackSpeed: speed });
@@ -542,7 +542,7 @@ function App() {
   // AUDIO EVENT HANDLERS & EFFECTS
   // ------------------------------------------------------------------------
 
-  const updateCurrentSentence = () => {
+  const updateCurrentSentence = useCallback(() => {
     if (!audioRef.current) return;
     
     const time = audioRef.current.currentTime;
@@ -560,9 +560,9 @@ function App() {
     
     // Update highlight
     updateState({ currentSentenceIndex: foundIndex });
-  };
+  }, [state.sentences]);
 
-  const handleRepeatLogic = () => {
+  const handleRepeatLogic = useCallback(() => {
     if (!audioRef.current || state.repeatMode !== 'sentence' || state.currentSentenceIndex < 0) return;
     
     const time = audioRef.current.currentTime;
@@ -631,7 +631,8 @@ function App() {
         currentRepeat: 0,
       });
     }
-  };
+  }, [state.sentences, state.repeatMode, state.currentSentenceIndex, state.isRepeating, 
+      state.repeatCount, state.currentRepeat, state.repeatSentenceIndex]);
 
   // Main audio effect
   useEffect(() => {
@@ -693,7 +694,8 @@ function App() {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, [state.sentences, state.repeatMode, state.repeatCount, state.currentRepeat, 
-      state.currentSentenceIndex, state.isRepeating, state.repeatSentenceIndex, state.playbackSpeed]);
+      state.currentSentenceIndex, state.isRepeating, state.repeatSentenceIndex, state.playbackSpeed,
+      updateCurrentSentence, handleRepeatLogic]);
 
   // Keyboard shortcuts effect
   useEffect(() => {
@@ -712,7 +714,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [state.isPlaying, state.currentSentenceIndex]);
+  }, [togglePlayPause, goToPrevSentence, goToNextSentence]);
 
   // ------------------------------------------------------------------------
   // MOBILE-ENHANCED RENDER COMPONENTS
@@ -723,15 +725,17 @@ function App() {
 
     return (
       <div style={{
-        padding: '15px',
+        padding: '20px',
         margin: '15px 0',
-        backgroundColor: '#fff3cd',
-        border: '1px solid #ffeaa7',
-        borderRadius: '8px',
-        fontSize: '14px'
+        background: 'rgba(255, 193, 7, 0.15)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255, 193, 7, 0.3)',
+        borderRadius: '16px',
+        fontSize: '14px',
+        boxShadow: '0 4px 15px rgba(255, 193, 7, 0.2)'
       }}>
-        <h4 style={{ margin: '0 0 10px 0', color: '#856404' }}>📱 Mobile Upload Tips:</h4>
-        <ul style={{ margin: 0, paddingLeft: '20px', color: '#856404' }}>
+        <h4 style={{ margin: '0 0 12px 0', color: 'rgba(255, 255, 255, 0.95)', fontWeight: '600' }}>📱 Mobile Upload Tips:</h4>
+        <ul style={{ margin: 0, paddingLeft: '20px', color: 'rgba(255, 255, 255, 0.8)' }}>
           <li>Make sure your file is under 100MB</li>
           <li>Supported formats: MP3, WAV, M4A, AAC, OGG</li>
           <li>Allow file access when prompted</li>
@@ -743,13 +747,17 @@ function App() {
         <button 
           onClick={() => updateState({ showMobileHelp: false })} 
           style={{
-            marginTop: '10px',
-            padding: '5px 10px',
-            backgroundColor: '#ffc107',
-            border: 'none',
-            borderRadius: '4px',
-            fontSize: '12px',
-            cursor: 'pointer'
+            marginTop: '12px',
+            padding: '8px 16px',
+            background: 'rgba(255, 193, 7, 0.8)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            borderRadius: '8px',
+            fontSize: '13px',
+            cursor: 'pointer',
+            color: 'white',
+            fontWeight: '600',
+            transition: 'all 0.3s ease'
           }}
         >
           Got it! ✓
@@ -930,23 +938,38 @@ function App() {
 
   const renderStatusPanel = () => (
     <div style={{
-      padding: '20px',
-      backgroundColor: state.isRepeating ? '#fff3cd' : '#f8f9fa',
-      borderRadius: '10px',
+      padding: '24px',
+      background: state.isRepeating 
+        ? 'rgba(255, 193, 7, 0.15)' 
+        : 'rgba(255, 255, 255, 0.1)',
+      backdropFilter: 'blur(15px)',
+      borderRadius: '16px',
       margin: '20px 0',
-      fontFamily: 'Arial, sans-serif',
+      fontFamily: 'inherit',
       fontSize: state.isMobile ? '16px' : '14px',
-      border: state.isRepeating ? '3px solid #ffc107' : '2px solid #dee2e6'
+      border: state.isRepeating 
+        ? '2px solid rgba(255, 193, 7, 0.4)' 
+        : '1px solid rgba(255, 255, 255, 0.2)',
+      boxShadow: state.isRepeating 
+        ? '0 4px 20px rgba(255, 193, 7, 0.3)' 
+        : '0 4px 15px rgba(0, 0, 0, 0.1)'
     }}>
-      <div style={{ fontSize: state.isMobile ? '18px' : '16px', fontWeight: 'bold', marginBottom: '15px', textAlign: 'center' }}>
+      <div style={{ 
+        fontSize: state.isMobile ? '18px' : '16px', 
+        fontWeight: 'bold', 
+        marginBottom: '16px', 
+        textAlign: 'center',
+        color: state.isRepeating ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.9)'
+      }}>
         {state.isRepeating ? '🔄 REPEATING MODE ACTIVE 🔄' : '📊 STATUS PANEL'}
       </div>
       
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: state.isMobile ? '1fr' : '1fr 1fr', 
-        gap: '10px', 
-        marginBottom: '15px' 
+        gap: '12px', 
+        marginBottom: '16px',
+        color: 'rgba(255, 255, 255, 0.8)'
       }}>
         <div>🕐 <strong>Time:</strong> {state.currentTime.toFixed(1)}s</div>
         <div>🎯 <strong>Sentence:</strong> #{state.currentSentenceIndex + 1}</div>
@@ -956,12 +979,15 @@ function App() {
       
       {state.isRepeating && (
         <div style={{ 
-          backgroundColor: '#ffeaa7',
-          padding: '15px',
-          borderRadius: '8px',
+          background: 'rgba(255, 193, 7, 0.2)',
+          backdropFilter: 'blur(10px)',
+          padding: '16px',
+          borderRadius: '12px',
           textAlign: 'center',
           fontSize: state.isMobile ? '16px' : '14px',
-          fontWeight: 'bold'
+          fontWeight: 'bold',
+          color: 'rgba(255, 255, 255, 0.95)',
+          border: '1px solid rgba(255, 193, 7, 0.3)'
         }}>
           🔄 REPEATING SENTENCE #{state.repeatSentenceIndex + 1}: {state.currentRepeat}/{state.repeatCount}
         </div>
@@ -1060,64 +1086,66 @@ function App() {
 
   return (
     <div className="App">
-      <header className="dashboard-header">
-        <h1 className="dashboard-title">UPolly</h1>
-        <h2 className="dashboard-subtitle">
-          Practise English via polly!
-          {state.isMobile && <span style={{ fontSize: '14px', color: '#666' }}> (📱 Mobile)</span>}
-        </h2>
-      </header>
+      <div className="app-container">
+        <header className="dashboard-header">
+          <h1 className="dashboard-title">UPolly</h1>
+          <h2 className="dashboard-subtitle">
+            Practise English via polly!
+            {state.isMobile && <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}> (📱 Mobile)</span>}
+          </h2>
+        </header>
 
-      <button 
-        className="new-audio-btn" 
-        onClick={handleNewAudioClick}
-        disabled={state.isUploading}
-        style={{
-          padding: state.isMobile ? '15px 25px' : '10px 20px',
-          fontSize: state.isMobile ? '18px' : '16px',
-          minHeight: state.isMobile ? '50px' : 'auto',
-          opacity: state.isUploading ? 0.6 : 1,
-          cursor: state.isUploading ? 'not-allowed' : 'pointer'
-        }}
-      >
-        + New Audio
-      </button>
-
-      {state.showForm && renderUploadForm()}
-
-      {state.uploadMessage && (
-        <div 
-          className="upload-message"
+        <button 
+          className="new-audio-btn" 
+          onClick={handleNewAudioClick}
+          disabled={state.isUploading}
           style={{
-            fontSize: state.isMobile ? '16px' : '14px',
-            padding: state.isMobile ? '15px' : '10px'
+            padding: state.isMobile ? '15px 25px' : '16px 32px',
+            fontSize: state.isMobile ? '18px' : '1.1rem',
+            minHeight: state.isMobile ? '50px' : 'auto',
+            opacity: state.isUploading ? 0.6 : 1,
+            cursor: state.isUploading ? 'not-allowed' : 'pointer'
           }}
         >
-          {state.uploadMessage}
-        </div>
-      )}
+          + New Audio
+        </button>
 
-      {state.audioUrl && state.sentences.length > 0 && (
-        <section className="audio-player-section">
-          <h3>Audio Player</h3>
-          {renderPlayerControls()}
-          {renderStatusPanel()}
-          <div className="keyboard-hints" style={{
-            fontSize: state.isMobile ? '14px' : '12px'
-          }}>
-            💡 <strong>Shortcuts:</strong> Space = Play/Pause, ← → = Navigate sentences
+        {state.showForm && renderUploadForm()}
+
+        {state.uploadMessage && (
+          <div 
+            className="upload-message"
+            style={{
+              fontSize: state.isMobile ? '16px' : '14px',
+              padding: state.isMobile ? '15px' : '16px 20px'
+            }}
+          >
+            {state.uploadMessage}
           </div>
-        </section>
-      )}
-
-      <section className="sentences-section">
-        <h3>Sentences {state.sentences.length > 0 && `(${state.sentences.length} total)`}</h3>
-        {state.sentences.length === 0 ? (
-          <p>No sentences yet. Upload your first audio file!</p>
-        ) : (
-          renderSentencesList()
         )}
-      </section>
+
+        {state.audioUrl && state.sentences.length > 0 && (
+          <section className="audio-player-section">
+            <h3>Audio Player</h3>
+            {renderPlayerControls()}
+            {renderStatusPanel()}
+            <div className="keyboard-hints" style={{
+              fontSize: state.isMobile ? '14px' : '0.9rem'
+            }}>
+              💡 <strong>Shortcuts:</strong> Space = Play/Pause, ← → = Navigate sentences
+            </div>
+          </section>
+        )}
+
+        <section className="sentences-section">
+          <h3>Sentences {state.sentences.length > 0 && `(${state.sentences.length} total)`}</h3>
+          {state.sentences.length === 0 ? (
+            <p>No sentences yet. Upload your first audio file!</p>
+          ) : (
+            renderSentencesList()
+          )}
+        </section>
+      </div>
     </div>
   );
 }
